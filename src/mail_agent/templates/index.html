@@ -1,0 +1,51 @@
+{% extends "page.html" %}
+
+{% block title %}Mail Agent - Home{% endblock %}
+
+{% block content %}
+    {% if user_info %}
+        <div class="card">
+            <div class="card-body">
+                <h2 class="card-title">Welcome, {{ user_info.name }}!</h2>
+                <p class="card-text mb-1"><strong>Email:</strong> {{ user_info.email }}</p>
+                <p class="card-text"><strong>Account Created:</strong> {{ user_info.created_at.strftime('%B %d, %Y') }}</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <h3 class="card-title">Getting Started</h3>
+                <p class="card-text">Welcome to Mail Agent! Here's what you can do:</p>
+                <ul class="list-unstyled">
+                    <li class="mb-2">
+                        <i class="bi bi-envelope-check text-primary me-2"></i>
+                        <strong>Process Emails:</strong> Set up intelligent email processing rules
+                    </li>
+                    <li class="mb-2">
+                        <i class="bi bi-gear text-primary me-2"></i>
+                        <strong>Configure Instructions:</strong> Create custom processing instructions for your emails
+                    </li>
+                    <li class="mb-2">
+                        <i class="bi bi-robot text-primary me-2"></i>
+                        <strong>AI-Powered:</strong> Let AI handle your email management automatically
+                    </li>
+                </ul>
+                <div class="mt-3">
+                    <a href="/instructions" class="btn btn-primary">
+                        <i class="bi bi-plus-circle me-2"></i>Create Your First Instruction
+                    </a>
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <div class="card">
+            <div class="card-body text-center">
+                <h2 class="card-title">Please Sign In</h2>
+                <p class="card-text">Login with your Google account to access the Mail Agent.</p>
+                <a href="/login" class="login-btn">Login with Google</a>
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}
+
+
