@@ -6,6 +6,7 @@ import re
 from mail_agent.models import db
 from pathlib import Path
 from .config import Config
+from .gmail import Gmail
 from typing import List, Union, Any
 
 
@@ -18,6 +19,8 @@ class MailAgentApp(Flask):
     """
 
     google: Any
+    db: Any
+    gmail: Gmail
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -43,6 +46,9 @@ class MailAgentApp(Flask):
         
         # Register routes
         self.register_routes()
+
+        self.db = db
+       
 
     def config_dir(self, config_dir: str | Path | None) -> Path:
 
@@ -109,7 +115,7 @@ class MailAgentApp(Flask):
             authorize_url='https://accounts.google.com/o/oauth2/auth',
             authorize_params=None,
             api_base_url='https://www.googleapis.com/oauth2/v1/',
-            client_kwargs={'scope': 'openid email profile https://www.googleapis.com/auth/gmail.readonly'},
+            client_kwargs={'scope': 'openid email profile https://www.googleapis.com/auth/gmail.modify'},
             jwks_uri='https://www.googleapis.com/oauth2/v3/certs',
         )
 
@@ -138,7 +144,7 @@ class MailAgentApp(Flask):
             
 
 
-def init_app():
+def init_app() -> MailAgentApp:
     """Initialize and configure the Flask application"""
     
     # Initialize Flask app
