@@ -25,27 +25,50 @@ Body: No text content available
 
 For each email, please provide:
 1. A concise summary of the email content
-2. Up to 5 categories that could be used to classify this email
+2. Up to 3 categories that could be used to classify this email
 3. Determine if this email is a reply to an email sent by the user or someone in their organization (same email domain)
 4. Assess if this is a cold business prospecting email
 5. Determine if this email is a marketing or promotional email
 5. Determine if this email is related to business operations (accounting, healthcare, business filings, legal communication, taxes, etc.)
 6. Evaluate if the subject of the email is time-sensitive
 
-Some notes about proper categories: 
+Here is the list of permitted categories, and their definitions: 
 
-* Only mark an email as promotion ( 'is_promotion' ) if the email encourages the recepient to 
-purchase something or visit a website or perform a commercial action. Some things that are not 
-promotion are: Let's Encrypt certificate notices, grant opportunity notices, payroll time 
-announcements from Gusto, calls for submitting papers to conferences, website security updates, 
-updates from websites like Meetup or Github. Requests to perform an action, such as purchase or 
-subscription, to a commercial, retail or media site are promotions. 
++----+-----------------------------+---------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+|    | title                       | name          | description                                                                                                                                                                                                |
+|----+-----------------------------+---------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+|  0 | Cold Business Email         | cold          | Use for requests to consider a business promotion or service, such                                                                                                                                         |
+|    |                             |               | as: rooftop solar, business financing, social media consulting, services to "get more customers",                                                                                                          |
+|    |                             |               | increase sales leads, marketing services, offers to look at a case study. The messages will often                                                                                                          |
+|    |                             |               | mention "I haven't heard back" or "just following up on my last email" or "I know you are busy now".                                                                                                       |
+|  1 | Sales & E-commerce          | sales         | Use for sales activities e-commerce transactions retail operations order management and revenue-generating communications.                                                                                 |
+|  2 | Marketing & Promotions      | promotion     | Use for marketing campaigns promotional materials advertisements business opportunities and sales-focused communications. Requests to perform an action, such as purchase or                               |
+|    |                             |               | subscription, to a commercial, retail or media site are promotions.                                                                                                                                        |
+|  3 | Account Management          | accounts      | Use for account administration membership management subscription handling user account changes and service management.                                                                                    |
+|  4 | Compliance & Legal          | compliance    | Use for legal documents compliance requirements authorization requests regulatory matters and official administrative communications.                                                                      |
+|  5 | Education & Training        | education     | Use for educational content including courses training materials academic communications professional development and learning resources.                                                                  |
+|  6 | Events & Activities         | events        | Use for event planning announcements coordination management including conferences workshops social gatherings and activity organization.                                                                  |
+|  7 | Financial & Accounting      | financial     | Use for all financial transactions including invoices payments billing accounting matters expense reports and monetary exchanges.                                                                          |
+|  8 | Fundraising & Donations     | fundraising   | Use for fundraising activities donation management nonprofit communications charity requests and contribution-related messages, also for grant announcements and grant research, such as from Grant Gopher |
+|  9 | Healthcare & Wellness       | healthcare    | Use for healthcare communications wellness programs medical information health-related updates and wellbeing initiatives.                                                                                  |
+| 10 | Human Resources             | hr            | Use for HR-related communications including employee matters staff coordination volunteer management and personnel administration.                                                                         |
+| 11 | Internal Communications     | internal      | Use for company internal communications including team updates business correspondence staff announcements and organizational messages.                                                                    |
+| 12 | Meetings & Scheduling       | meetings      | Use for all meeting-related communications including calendar invites scheduling coordination appointment setting and video conference arrangements.                                                       |
+| 13 | Miscellaneous & Other       | misc          | Use for emails that do not fit other categories including general inquiries unclassified messages and unique communications.                                                                               |
+| 14 | Networking & Community      | networking    | Use for professional networking community building relationship development industry connections and collaborative relationship communications.                                                            |
+| 15 | Notifications & Alerts      | notifications | Use for system notifications reminders alerts status updates deadline notices and automated messages that inform about events or changes.                                                                  |
+| 16 | Operations & Logistics      | operations    | Use for operational communications logistics coordination service management and business process communications.                                                                                          |
+| 17 | Personal & Family           | personal      | Use for personal communications family matters non-business personal emails and private correspondence.                                                                                                    |
+| 18 | Project Collaboration       | projects      | Use for project work team collaboration resource sharing creative work and coordinated efforts on specific initiatives.                                                                                    |
+| 19 | Security & Privacy          | security      | Use for security communications privacy notices data protection matters spam management and safety-related messages.                                                                                       |
+| 20 | Customer Support            | support       | Use for customer service interactions including support tickets help requests assistance inquiries and customer problem resolution.                                                                        |
+| 21 | Technology & IT             | technology    | Use for technical communications including software updates IT support system maintenance technology discussions and technical troubleshooting.                                                            |
+| 22 | Travel & Logistics          | travel        | Use for travel planning transportation arrangements location coordination and logistics related to movement or location.                                                                                   |
+| 23 | Communication & Updates     | updates       | Use for newsletters general communications information dissemination company updates and broad informational messages.                                                                                     |
+| 24 | Vendor & External Relations | vendors       | Use for external vendor communications partner relationships business contacts and third-party service provider interactions.                                                                              |
++----+-----------------------------+---------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
-* Cold Business prospecting emails are requests to consider a business promotion or service, such 
-as: rooftop solar, business financing, social media consulting, services to "get more customers", 
-increase sales leads, marketing services, offers to look at a case study. The messages will often
-mention "I haven't heard back" or "just following up on my last email" or "I know you are busy now". 
-
+In your category list, use the *name* of the category *not* the title. 
 
 Please provide your analysis in the following JSON format:
 
@@ -61,5 +84,6 @@ Please provide your analysis in the following JSON format:
   "confidence": 0.85
 }
 
+In your response, include *only* the json, not any markdown formatting. your response *must* be directly parsable as JSON. 
 
 The confidence field should represent your overall confidence in your analysis on a scale from 0 to 1.

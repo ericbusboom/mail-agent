@@ -74,7 +74,12 @@ class LLMManager:
             LLM client instance
         """
         provider = self.config.get('LLM_PROVIDER', 'openai').lower()
-        model_name = self.config.get('LLM_NAME', 'gpt-3.5-turbo')
+        
+        # Use OPENAI_MODEL from config if specified, otherwise fall back to LLM_NAME
+        if provider == 'openai':
+            model_name = self.config.get('OPENAI_MODEL', self.config.get('LLM_NAME', 'gpt-3.5-turbo'))
+        else:
+            model_name = self.config.get('LLM_NAME', 'gpt-3.5-turbo')
         
         logger.info(f"Creating LLM client: provider={provider}, model={model_name}")
         
@@ -350,7 +355,12 @@ class LLMManager:
     def get_client_info(self) -> Dict[str, Any]:
         """Get information about the current LLM client."""
         provider = self.config.get('LLM_PROVIDER', 'openai').lower()
-        model_name = self.config.get('LLM_NAME', 'gpt-3.5-turbo')
+        
+        # Get the correct model name based on provider
+        if provider == 'openai':
+            model_name = self.config.get('OPENAI_MODEL', self.config.get('LLM_NAME', 'gpt-3.5-turbo'))
+        else:
+            raise ValueError(f"Unsupported provider: {provider}")
         
         return {
             'provider': provider,

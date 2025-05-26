@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from flask_sqlalchemy import SQLAlchemy
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING, List
 
 if TYPE_CHECKING:
     from mail_agent.gmail import GmailMessage
@@ -108,9 +108,12 @@ class Email(db.Model):
         Returns:
             Email model instance
         """
-        # Parse labels and determine status flags
+        # Get label IDs and convert to names
         label_ids = gmail_message.label_ids
-        labels_str = ','.join(label_ids) if label_ids else ''
+        label_names = cls._convert_label_ids_to_names(gmail_message)
+        
+        # Join the label names into a comma-separated string
+        labels_str = ','.join(label_names) if label_names else ''
         
         email = cls()
         email.id = gmail_message.id
@@ -131,6 +134,8 @@ class Email(db.Model):
         email.body = gmail_message.body_text
         email.snippet = gmail_message.snippet
         email.labels = labels_str
+        
+        # Still use IDs for boolean flags since these are standard Gmail system labels
         email.is_in_inbox = 'INBOX' in label_ids
         email.is_spam = 'SPAM' in label_ids
         email.is_starred = 'STARRED' in label_ids
@@ -176,7 +181,12 @@ class Email(db.Model):
             
             # Update labels and flags
             label_ids = gmail_message.label_ids
-            existing_email.labels = ','.join(label_ids) if label_ids else ''
+            label_names = cls._convert_label_ids_to_names(gmail_message)
+            
+            # Join the label names into a comma-separated string
+            existing_email.labels = ','.join(label_names) if label_names else ''
+            
+            # Still use IDs for boolean flags since these are standard Gmail system labels
             existing_email.is_in_inbox = 'INBOX' in label_ids
             existing_email.is_spam = 'SPAM' in label_ids
             existing_email.is_starred = 'STARRED' in label_ids
@@ -191,28 +201,66 @@ class Email(db.Model):
             # Create new email
             return cls.from_gmail(gmail_message, user_id)
     
+    @staticmethod
+    def _convert_label_ids_to_names(gmail_message) -> List[str]:
+        """
+        Convert Gmail label IDs to label names.
+        
+        Args:
+            gmail_message: GmailMessage instance with label_ids and optionally service
+            
+        Returns:
+            List of label names (or IDs if conversion fails)
+        """
+        label_ids = gmail_message.label_ids
+        
+        # Convert label IDs to names if a service is available
+        if hasattr(gmail_message, 'service') and gmail_message.service:
+            try:
+                # Get all labels from the Gmail API
+                labels_response = gmail_message.service.users().labels().list(userId='me').execute()
+                labels_map = {label['id']: label['name'] for label in labels_response.get('labels', [])}
+                
+                # Map IDs to names
+                label_names = []
+                for label_id in label_ids:
+                    if label_id in labels_map:
+                        label_names.append(labels_map[label_id])
+                    else:
+                        # If we can't find the name, use the ID
+                        label_names.append(label_id)
+                return label_names
+            except Exception as e:
+                # If there's an error, fall back to using the IDs
+                import logging
+                logging.getLogger(__name__).error(f"Failed to convert label IDs to names: {e}")
+                return label_ids
+        else:
+            # If no service is available, use the IDs
+            return label_ids
+    
     def get_label_list(self) -> list[str]:
         """
         Get labels as a list instead of comma-separated string.
         
         Returns:
-            List of label IDs
+            List of label names
         """
         if not self.labels:
             return []
         return [label.strip() for label in self.labels.split(',') if label.strip()]
     
-    def has_label(self, label_id: str) -> bool:
+    def has_label(self, label_name: str) -> bool:
         """
         Check if this email has a specific label.
         
         Args:
-            label_id: Label ID to check for
+            label_name: Label name to check for
             
         Returns:
             True if email has the label, False otherwise
         """
-        return label_id in self.get_label_list()
+        return label_name in self.get_label_list()
     
     def __repr__(self):
         return f'<Email {self.id} from="{self.from_address}" subject="{self.subject[:50]}...">'

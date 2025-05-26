@@ -15,9 +15,9 @@ from typing import List, Optional
 @mail_cmd.command('list')
 @click.option('--label', '-l', help='Filter emails by label name')
 @click.option('--user-email', '-u', help='User email address (if not specified, uses first user)')
-@click.option('--max-results', '-n', default=20, help='Maximum number of emails to retrieve (default: 20)')
+@click.option('--limit', '-l', default=20, help='Maximum number of emails to retrieve (default: 20)')
 @handle_exceptions
-def list_emails(label, user_email, max_results):
+def list_emails(label, user_email, limit):
     """List emails in inbox or with specific label."""
     app = init_app()
     
@@ -31,7 +31,7 @@ def list_emails(label, user_email, max_results):
             if label:
                 # List emails with specific label
                 click.echo(f"Fetching emails with label '{label}' for user: {user.email}")
-                emails = gmail.find_emails_with_label(label, max_results=max_results)
+                emails = gmail.find_emails_with_label(label, max_results=limit)
                 
                 if not emails:
                     click.echo(f"No emails found with label '{label}'")
@@ -41,7 +41,7 @@ def list_emails(label, user_email, max_results):
             else:
                 # List inbox emails
                 click.echo(f"Fetching inbox emails for user: {user.email}")
-                emails = gmail.read_inbox_emails(max_results=max_results)
+                emails = gmail.read_inbox_emails(max_results=limit)
                 
                 if not emails:
                     click.echo("No emails found in inbox")
@@ -107,10 +107,10 @@ def list_labels(user_email):
 
 @mail_cmd.command('store')
 @click.option('--user-email', '-u', help='User email address (if not specified, uses first user)')
-@click.option('--max-results', '-n', default=1000, help='Maximum number of emails to retrieve if no previous emails exist (default: 1000)')
+@click.option('--limit', '-l', default=1000, help='Maximum number of emails to retrieve if no previous emails exist (default: 1000)')
 @click.option('--force-full', '-f', is_flag=True, help='Force fetching the maximum number of emails regardless of existing data')
 @handle_exceptions
-def store_emails(user_email, max_results, force_full):
+def store_emails(user_email, limit, force_full):
     """Download emails and store them in the database."""
     app = init_app()
     
@@ -131,7 +131,7 @@ def store_emails(user_email, max_results, force_full):
                 click.echo(f"Found existing emails. Fetching emails newer than {latest_email.send_time}")
                 # In a more robust implementation, we would use the date to create a Gmail query
                 # For now, we'll just fetch all and filter
-                emails = gmail.fetch_all(max_results=max_results)
+                emails = gmail.fetch_all(max_results=limit)
                 # Filter emails that are newer than our latest email
                 new_emails = []
                 for e in emails:
@@ -153,8 +153,8 @@ def store_emails(user_email, max_results, force_full):
                 click.echo(f"Found {len(new_emails)} new emails to store (out of {len(emails)} fetched)")
                 emails_to_store = new_emails
             else:
-                click.echo(f"No existing emails found or full sync requested. Fetching up to {max_results} emails.")
-                emails_to_store = gmail.fetch_all(max_results=max_results)
+                click.echo(f"No existing emails found or full sync requested. Fetching up to {limit} emails.")
+                emails_to_store = gmail.fetch_all(max_results=limit)
                 click.echo(f"Found {len(emails_to_store)} emails to store")
             
             # Store emails in the database
@@ -352,6 +352,13 @@ def analyze_emails(user_email, limit, force):
         # Initialize LLM manager
         from mail_agent.ai.manager import LLMManager
         llm_manager = LLMManager(app)
+        
+        # Get model information
+        client_info = llm_manager.get_client_info()
+        model_name = client_info['model']
+        provider = client_info['provider'].upper()
+        
+        click.echo(f"Using {provider} model: {model_name}")
         
         # Process emails in batches to avoid token limits
         batch_size = 1  # Process one email at a time for detailed analysis
