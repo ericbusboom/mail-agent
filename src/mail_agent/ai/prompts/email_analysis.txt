@@ -1,0 +1,65 @@
+You are an AI assistant helping to analyze email messages. Please analyze the following email(s) and provide structured insights according to the format requested.
+
+{{ context }}
+
+{% if messages %}
+Here are the email(s) to analyze:
+
+{% for message in messages %}
+---
+Email {{ loop.index }}:
+From: {{ message.from_address }}
+To: {{ message.to_address }}
+Subject: {{ message.subject }}
+Date: {{ message.send_time }}
+
+{% if message.body %}
+Body:
+{{ message.body }}
+{% else %}
+Body: No text content available
+{% endif %}
+
+{% endfor %}
+{% endif %}
+
+For each email, please provide:
+1. A concise summary of the email content
+2. Up to 5 categories that could be used to classify this email
+3. Determine if this email is a reply to an email sent by the user or someone in their organization (same email domain)
+4. Assess if this is a cold business prospecting email
+5. Determine if this email is a marketing or promotional email
+5. Determine if this email is related to business operations (accounting, healthcare, business filings, legal communication, taxes, etc.)
+6. Evaluate if the subject of the email is time-sensitive
+
+Some notes about proper categories: 
+
+* Only mark an email as promotion ( 'is_promotion' ) if the email encourages the recepient to 
+purchase something or visit a website or perform a commercial action. Some things that are not 
+promotion are: Let's Encrypt certificate notices, grant opportunity notices, payroll time 
+announcements from Gusto, calls for submitting papers to conferences, website security updates, 
+updates from websites like Meetup or Github. Requests to perform an action, such as purchase or 
+subscription, to a commercial, retail or media site are promotions. 
+
+* Cold Business prospecting emails are requests to consider a business promotion or service, such 
+as: rooftop solar, business financing, social media consulting, services to "get more customers", 
+increase sales leads, marketing services, offers to look at a case study. The messages will often
+mention "I haven't heard back" or "just following up on my last email" or "I know you are busy now". 
+
+
+Please provide your analysis in the following JSON format:
+
+
+{
+  "summary": "Brief summary of the email content",
+  "categories": ["Category1", "Category2", "Category3"],
+  "is_reply_to_organization": true/false,
+  "is_cold_prospecting": true/false,
+  "is_promotion": true/false
+  "is_business_operations": true/false,
+  "is_time_sensitive": true/false,
+  "confidence": 0.85
+}
+
+
+The confidence field should represent your overall confidence in your analysis on a scale from 0 to 1.

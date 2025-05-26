@@ -72,6 +72,11 @@ class Email(db.Model):
     body = db.Column(db.Text)  # Email body content
     snippet = db.Column(db.String(500))  # Gmail snippet
     
+
+    analysis = db.Column(db.Text)  # AI Analysis, JSON format
+
+    data = db.Column(db.Text)  # Other data, JSON format
+
     # Labels and status flags
     labels = db.Column(db.Text)  # Comma-separated list of labels
     is_in_inbox = db.Column(db.Boolean, default=False)

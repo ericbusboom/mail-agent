@@ -8,7 +8,33 @@ from mail_agent.app import init_app, MailAgentApp
 from mail_agent.models import db
 from mail_agent.cli.utils import handle_exceptions
 from mail_agent.cli.main import db_cmd
+from datetime import timezone
+from sqlalchemy import text
+import stat
 
+
+def sqlite_uri_to_path(db_uri: str) -> str:
+    """
+    Convert a SQLite database URI to a file path.
+    
+    Args:
+        db_uri: The SQLite database URI (e.g., sqlite:///path/to/db.sqlite)
+        
+    Returns:
+        The absolute file path to the SQLite database.
+    """
+    if not db_uri.startswith('sqlite:///'):
+        raise ValueError("The provided URI is not a valid SQLite URI.")
+    
+    # Extract the path from the URI
+    db_path = db_uri.replace('sqlite:///', '')
+    
+    # If it's a relative path, make it absolute using the app's root_path
+    if not os.path.isabs(db_path):
+        app = init_app()
+        db_path = os.path.join(app.root_path, db_path)
+        
+    return db_path
 
 def _create_db(app: MailAgentApp) -> None:
     
@@ -19,11 +45,7 @@ def _create_db(app: MailAgentApp) -> None:
     # For SQLite, create the directory if it doesn't exist
     if db_uri.startswith('sqlite:///'):
         # Extract the path from the URI
-        db_path = db_uri.replace('sqlite:///', '')
-        
-        # If it's a relative path, make it absolute using the app's root_path
-        if not os.path.isabs(db_path):
-            db_path = os.path.join(app.root_path, db_path)
+        db_path = sqlite_uri_to_path(db_uri)
             
         # Create the directory if it doesn't exist
         db_dir = os.path.dirname(db_path)
@@ -32,7 +54,7 @@ def _create_db(app: MailAgentApp) -> None:
             os.makedirs(db_dir, exist_ok=True)
             
             # Set appropriate permissions
-            import stat
+          
             try:
                 os.chmod(db_dir, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)  # 0777 permissions
                 click.echo(f"Set directory permissions to 0777")
@@ -43,6 +65,19 @@ def _create_db(app: MailAgentApp) -> None:
     with app.app_context():
         click.echo("Creating database tables...")
         db.create_all()
+        
+        # Set database file permissions for SQLite
+        if db_uri.startswith('sqlite:///'):
+            db_path = sqlite_uri_to_path(db_uri)
+            
+            if os.path.exists(db_path):
+                try:
+                    os.chmod(db_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH)  # 664 permissions
+                    click.echo(f"Set database file permissions to 664")
+                except Exception as e:
+                    raise
+                    click.echo(f"Warning: Failed to set database file permissions: {e}", err=True)
+
         click.echo("Database tables created successfully.")
     
 
@@ -102,8 +137,7 @@ def update_schema():
     
     with app.app_context():
         try:
-            from datetime import timezone
-            from sqlalchemy import text
+
             
             # For SQLite databases, we need to recreate the table
             db_uri = app.config.get('SQLALCHEMY_DATABASE_URI')

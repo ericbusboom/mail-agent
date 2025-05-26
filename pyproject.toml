@@ -24,6 +24,8 @@ dependencies = [
     "numpy>=1.26.0",
     "vlite>=0.2.1",
     "python-slugify>=8.0.4",
+    "beautifulsoup4>=4.12.2",
+    "html5lib>=1.1",
 ]
 
 [project.scripts]

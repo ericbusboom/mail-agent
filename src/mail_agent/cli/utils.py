@@ -27,9 +27,11 @@ def handle_exceptions(f: F) -> F:
     def wrapper(*args, **kwargs):
 
         ctx = click.get_current_context(silent=True)
-        verbose = ctx and ctx.params.get('verbose', False)
-        exceptions = ctx and ctx.params.get('exceptions', False)    
 
+        verbose = ctx and ctx.obj.get('verbose', False)
+        exceptions = ctx and ctx.obj.get('exceptions', False)    
+
+    
         if exceptions:
             # If exceptions are enabled, just call the function directly
             return f(*args, **kwargs)

@@ -3,10 +3,14 @@ Gmail/mail operations commands for Mail Agent CLI.
 """
 import click
 import sys
+import json
 from mail_agent.app import init_app
 from mail_agent.models import User, db, Email
+from mail_agent.gmail import Gmail
 from mail_agent.cli.utils import handle_exceptions, get_user_by_email
 from mail_agent.cli.main import mail_cmd
+
+from typing import List, Optional
 
 @mail_cmd.command('list')
 @click.option('--label', '-l', help='Filter emails by label name')
@@ -222,6 +226,21 @@ def view_emails(user_email, id, list_only, limit):
             click.echo(f"Labels: {email.labels}")
             click.echo(f"Snippet: {email.snippet}")
             
+            if email.analysis:
+                click.echo("\nAI Analysis:")
+                try:
+                    # Try to parse JSON for pretty display
+                
+                    analysis_data = json.loads(email.analysis)
+                    for key, value in analysis_data.items():
+                        if isinstance(value, list):
+                            click.echo(f"  {key}: {', '.join(value)}")
+                        else:
+                            click.echo(f"  {key}: {value}")
+                except json.JSONDecodeError:
+                    # If not valid JSON, display as plain text
+                    click.echo(email.analysis)
+            
             if not list_only:
                 click.echo("\nBody:")
                 if email.body:
@@ -254,11 +273,25 @@ def view_emails(user_email, id, list_only, limit):
                 # Check if body is empty
                 body_status = "[Empty]" if not email.body else f"[{len(email.body)} chars]"
                 
+                if email.analysis:
+        
+                    analysis = json.loads(email.analysis.strip('```')) if email.analysis else {}
+                   
+                else:
+                    analysis = {}
+
+                from textwrap import indent
+
                 click.echo(f"{i:3d}. ID: {email.id}")
-                click.echo(f"     From: {sender}")
-                click.echo(f"     Subject: {subject}")
-                click.echo(f"     Date: {date_str}")
-                click.echo(f"     Body: {body_status}")
+                click.echo(f"    From: {sender}")
+                click.echo(f"    Subject: {subject}")
+                click.echo(f"    Date: {date_str}")
+                click.echo(f"    Body: {body_status}")
+                if analysis:
+                    click.echo(f"    Analysis:")
+                    click.echo(indent(json.dumps(analysis, indent=2), ' ' * 6))
+
+
                 click.echo("-" * 80)
                 
             click.echo(f"\nTo view a specific email, use: mactl mail view --id <email_id>")
@@ -285,3 +318,72 @@ def delete():
             click.echo(f"Error deleting emails: {str(e)}", err=True)
             db.session.rollback()
             sys.exit(1)
+
+
+@mail_cmd.command('analyze')
+@click.option('--user-email', '-u', help='User email address (if not specified, uses first user)')
+@click.option('--limit', default=100, help='Maximum number of emails to analyze (default: 10)')
+@click.option('--force', '-f', is_flag=True, help='Force re-analysis of already analyzed emails')
+@handle_exceptions
+def analyze_emails(user_email, limit, force):
+    """Analyze emails in the database using AI."""
+    app = init_app()
+    
+    with app.app_context():
+        user = get_user_by_email(app, user_email)
+        
+        # Query for emails without analysis or with force flag
+        if force:
+            query = Email.query.filter_by(user_id=user.id)
+        else:
+            query = Email.query.filter_by(user_id=user.id).filter(
+                (Email.analysis.is_(None)) | (Email.analysis == '')
+            )
+        
+        # Get emails to analyze
+        emails: List[Email] = query.order_by(Email.send_time.desc()).limit(limit).all()
+        
+        if not emails:
+            click.echo(f"No emails found to analyze for user {user.email}")
+            return
+        
+        click.echo(f"Analyzing {len(emails)} emails for user {user.email}...")
+        
+        # Initialize LLM manager
+        from mail_agent.ai.manager import LLMManager
+        llm_manager = LLMManager(app)
+        
+        # Process emails in batches to avoid token limits
+        batch_size = 1  # Process one email at a time for detailed analysis
+        
+        with click.progressbar(range(0, len(emails), batch_size), 
+                               label='Analyzing emails') as bar:
+            for i in bar:
+                batch = emails[i:i + batch_size]
+                
+                try:
+                    # Create prompt using email_analysis template directly with Email objects
+                    prompt = llm_manager.create_document(
+                        messages=batch,
+                        template_name="email_analysis"
+                    )
+                    
+                    # Send to LLM
+                    response = llm_manager.send_request(prompt)
+                    
+                    # Update the database with the analysis results
+                    for email in batch:
+                        # Store the analysis in the database
+                        email.analysis = response
+                        db.session.add(email)
+                        
+                        # Commit after each email to avoid losing all work if there's an error
+                        db.session.commit()
+                        
+                except Exception as e:
+                    click.echo(f"\nError analyzing batch starting at email {i+1}: {str(e)}", err=True)
+                    db.session.rollback()
+                    continue
+        
+        click.echo(f"Successfully analyzed {len(emails)} emails.")
+        click.echo("To view analysis results, use: mactl mail view --id <email_id>")

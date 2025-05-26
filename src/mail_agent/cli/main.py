@@ -16,6 +16,7 @@ def cli(ctx, verbose, exceptions):
     ctx.obj['exceptions'] = exceptions
 
 
+
 @cli.group('mail')
 def mail_cmd():
     """Gmail operations and management."""
