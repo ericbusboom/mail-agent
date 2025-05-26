@@ -7,6 +7,7 @@ from mail_agent.models import db
 from pathlib import Path
 from .config import Config
 from .gmail import Gmail
+from .ai.manager import LLMManager
 from typing import List, Union, Any
 
 
@@ -21,6 +22,7 @@ class MailAgentApp(Flask):
     google: Any
     db: Any
     gmail: Gmail
+    llm_manager: LLMManager
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -37,6 +39,9 @@ class MailAgentApp(Flask):
         
         # Load configuration
         self.app_config = self.get_config(kwargs.get('config_dir', None))
+        
+        # Initialize LLM Manager
+        self.llm_manager = LLMManager(self)
         
         self.register_oauth()
 
@@ -115,7 +120,11 @@ class MailAgentApp(Flask):
             authorize_url='https://accounts.google.com/o/oauth2/auth',
             authorize_params=None,
             api_base_url='https://www.googleapis.com/oauth2/v1/',
-            client_kwargs={'scope': 'openid email profile https://www.googleapis.com/auth/gmail.modify'},
+            client_kwargs={
+                'scope': 'openid email profile https://www.googleapis.com/auth/gmail.modify',
+                'access_type': 'offline',
+                'prompt': 'consent'
+            },
             jwks_uri='https://www.googleapis.com/oauth2/v3/certs',
         )
 

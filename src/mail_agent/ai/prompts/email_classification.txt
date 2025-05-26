@@ -1,0 +1,38 @@
+You are an expert email classifier. Your task is to classify emails based on the provided topic definitions.
+
+Here are the available topics:
+{{ topics_document }}
+
+Now classify the following emails:
+
+{% for message in messages %}
+---
+Email {{ loop.index }}:
+From: {{ message.sender }}
+To: {{ message.recipient }}
+Subject: {{ message.subject }}
+Date: {{ message.date_str }}
+
+{% if message.body_text %}
+Body:
+{{ message.body_text[:500] }}{% if message.body_text|length > 500 %}... (truncated){% endif %}
+{% else %}
+Body: No text content available
+{% endif %}
+
+{% endfor %}
+
+For each email, assign it to the most appropriate topic from the list above. If an email doesn't fit 
+any topic well, assign it to "Other".
+
+Format your response as JSON:
+{
+  "classifications": [
+    {
+      "email_index": 1,
+      "topic": "Topic Name",
+      "confidence": 0.95,
+      "reasoning": "Brief explanation of why this topic was chosen"
+    }
+  ]
+}

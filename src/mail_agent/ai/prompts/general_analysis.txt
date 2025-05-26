@@ -1,0 +1,29 @@
+You are an AI assistant helping to analyze and manage emails. Please provide helpful 
+insights and perform the requested task with the following context:
+
+{{ context }}
+
+Task: {{ task }}
+
+{% if messages %}
+Here are the relevant emails:
+
+{% for message in messages %}
+---
+Email {{ loop.index }}:
+From: {{ message.sender }}
+To: {{ message.recipient }}
+Subject: {{ message.subject }}
+Date: {{ message.date_str }}
+
+{% if message.body_text %}
+Body:
+{{ message.body_text[:800] }}{% if message.body_text|length > 800 %}... (truncated){% endif %}
+{% else %}
+Body: No text content available
+{% endif %}
+
+{% endfor %}
+{% endif %}
+
+Please provide a thorough and helpful response.

@@ -235,15 +235,21 @@ class Gmail:
                 client_secret=self.app.config['GOOGLE_CLIENT_SECRETS']['web']['client_secret']
             )
             
-            # Refresh token if needed
-            if credentials.expired and credentials.refresh_token:
-                credentials.refresh(Request())
-                
-                # Update stored tokens
-                user.access_token = credentials.token
+            # Check if token is expired
+            if credentials.expired:
                 if credentials.refresh_token:
-                    user.refresh_token = credentials.refresh_token
-                self.app.db.session.commit()
+                    logger.info(f"Access token expired for user {self.user_id}, refreshing...")
+                    credentials.refresh(Request())
+                    
+                    # Update stored tokens
+                    user.access_token = credentials.token
+                    if credentials.refresh_token:
+                        user.refresh_token = credentials.refresh_token
+                    self.app.db.session.commit()
+                    logger.info(f"Successfully refreshed tokens for user {self.user_id}")
+                else:
+                    logger.warning(f"Access token expired for user {self.user_id} but no refresh token available")
+                    # Continue anyway - the token might still work for a short time
             
             # Build and return service
             service = build('gmail', 'v1', credentials=credentials)
@@ -398,7 +404,7 @@ class Gmail:
         if not label_id:
             logger.warning(f"Label '{label_name}' not found for user {self.user_id}")
             # If label doesn't exist, all emails don't have it
-            return self.find_all_emails(max_results)
+            return self.fetch_all(max_results)
         
         service = self._get_service()
         
@@ -436,12 +442,12 @@ class Gmail:
             logger.error(f"Failed to find emails without label '{label_name}' for user {self.user_id}: {e}")
             return []
     
-    def find_all_emails(self, max_results: int = 100) -> List[GmailMessage]:
+    def fetch_all(self, max_results: int = 100) -> List[GmailMessage]:
         """
         Find all emails in the account.
         
         Args:
-            max_results: Maximum number of emails to return
+            max_results: Maximum number of emails to return (can exceed 500)
             
         Returns:
             List of GmailMessage objects
@@ -449,32 +455,155 @@ class Gmail:
         service = self._get_service()
         
         try:
-            # Get all message IDs
-            results = service.users().messages().list(
-                userId='me',
-                maxResults=max_results
-            ).execute()
+            all_messages = []
+            next_page_token = None
             
-            messages = results.get('messages', [])
+            while len(all_messages) < max_results:
+                # Calculate how many to fetch in this batch (max 500 per API call)
+                batch_size = min(500, max_results - len(all_messages))
+                
+                # Get message IDs for this page
+                request_params = {
+                    'userId': 'me',
+                    'maxResults': batch_size
+                }
+                
+                if next_page_token:
+                    request_params['pageToken'] = next_page_token
+                
+                results = service.users().messages().list(**request_params).execute()
+                
+                messages = results.get('messages', [])
+                if not messages:
+                    break  # No more messages
+                
+                # Fetch full message data for each message in this batch
+                for message in messages:
+                    if len(all_messages) >= max_results:
+                        break
+                        
+                    try:
+                        msg_data = service.users().messages().get(
+                            userId='me',
+                            id=message['id']
+                        ).execute()
+                        
+                        gmail_message = GmailMessage(msg_data, service)
+                        all_messages.append(gmail_message)
+                        
+                    except Exception as e:
+                        logger.error(f"Failed to fetch message {message['id']}: {e}")
+                        continue
+                
+                # Check if there are more pages
+                next_page_token = results.get('nextPageToken')
+                if not next_page_token:
+                    break  # No more pages
             
-            # Fetch full message data for each message
-            gmail_messages = []
-            for message in messages:
-                try:
-                    msg_data = service.users().messages().get(
-                        userId='me',
-                        id=message['id']
-                    ).execute()
-                    
-                    gmail_message = GmailMessage(msg_data, service)
-                    gmail_messages.append(gmail_message)
-                    
-                except Exception as e:
-                    logger.error(f"Failed to fetch message {message['id']}: {e}")
-                    continue
-            
-            return gmail_messages
+            return all_messages
         
         except Exception as e:
             logger.error(f"Failed to find all emails for user {self.user_id}: {e}")
+            return []
+    
+    def fetch_envelopes(self, max_results: int = 100) -> List[GmailMessage]:
+        """
+        Find email envelopes (metadata only) without message bodies.
+        This is more efficient when you only need sender, recipient, subject, etc.
+        Uses batch requests for much better performance.
+        
+        Args:
+            max_results: Maximum number of emails to return (can exceed 500)
+            
+        Returns:
+            List of GmailMessage objects with metadata only (no body content)
+        """
+        service = self._get_service()
+        
+        try:
+            all_messages = []
+            next_page_token = None
+            
+            while len(all_messages) < max_results:
+                # Calculate how many to fetch in this batch (max 500 per API call)
+                batch_size = min(500, max_results - len(all_messages))
+                
+                # Get message IDs for this page
+                request_params = {
+                    'userId': 'me',
+                    'maxResults': batch_size
+                }
+                
+                if next_page_token:
+                    request_params['pageToken'] = next_page_token
+                
+                results = service.users().messages().list(**request_params).execute()
+                
+                messages = results.get('messages', [])
+                if not messages:
+                    break  # No more messages
+                
+                # Use batch requests to fetch message envelopes efficiently
+                # Process in batches of 50 (conservative batch size to avoid rate limits)
+                message_batch_size = 5
+                messages_to_process = messages[:min(len(messages), max_results - len(all_messages))]
+                
+                for i in range(0, len(messages_to_process), message_batch_size):
+                    batch_messages = messages_to_process[i:i + message_batch_size]
+                    
+                    # Create batch request
+                    batch = service.new_batch_http_request()
+                    batch_results = {}
+                    
+                    def create_callback(msg_id):
+                        def callback(request_id, response, exception):
+                            if exception is not None:
+                                # Check if it's an authentication error
+                                if hasattr(exception, 'resp') and exception.resp.status == 401:
+                                    logger.error(f"Authentication failed for message {msg_id}: {exception}")
+                                else:
+                                    logger.error(f"Failed to fetch message envelope {msg_id}: {exception}")
+                            else:
+                                batch_results[msg_id] = response
+                        return callback
+                    
+                    # Add requests to batch
+                    for message in batch_messages:
+                        msg_id = message['id']
+                        request = service.users().messages().get(
+                            userId='me',
+                            id=msg_id,
+                            format='metadata',
+                            metadataHeaders=['From', 'To', 'Subject', 'Date', 'Message-ID']
+                        )
+                        batch.add(request, callback=create_callback(msg_id))
+                    
+                    # Execute batch request
+                    batch.execute()
+                    
+                    # Process batch results
+                    for message in batch_messages:
+                        msg_id = message['id']
+                        if msg_id in batch_results:
+                            try:
+                                gmail_message = GmailMessage(batch_results[msg_id], service)
+                                all_messages.append(gmail_message)
+                            except Exception as e:
+                                logger.error(f"Failed to process message envelope {msg_id}: {e}")
+                        
+                        if len(all_messages) >= max_results:
+                            break
+                    
+                    if len(all_messages) >= max_results:
+                        break
+                
+                # Check if there are more pages
+                next_page_token = results.get('nextPageToken')
+                if not next_page_token or len(all_messages) >= max_results:
+                    break  # No more pages or reached limit
+            
+            return all_messages
+        
+        except Exception as e:
+            logger.error(f"Failed to find email envelopes for user {self.user_id}: {e}")
             return []

@@ -19,6 +19,18 @@ def login():
     
     return ca.google.authorize_redirect(redirect_uri)
 
+@auth_bp.route('/reauth')
+def reauth():
+    """Route for forcing re-authentication to get refresh token."""
+    redirect_uri = url_for('auth.callback', _external=True)
+    
+    # Force consent to ensure we get a refresh token
+    return ca.google.authorize_redirect(
+        redirect_uri, 
+        access_type='offline',
+        prompt='consent'
+    )
+
 @auth_bp.route('/callback')
 def callback():
     """Handle OAuth callback from Google."""
