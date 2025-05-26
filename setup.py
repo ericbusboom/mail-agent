@@ -22,7 +22,7 @@ setup(
         ],
     entry_points={
         "console_scripts": [
-            "mactl=mail_agent.cli:cli",
+            "mactl=mail_agent.cli:main",
         ],
     },
 )

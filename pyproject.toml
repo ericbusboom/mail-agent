@@ -22,6 +22,8 @@ dependencies = [
     "langchain-google-genai>=2.0.5",
     "scikit-learn>=1.5.0",
     "numpy>=1.26.0",
+    "vlite>=0.2.1",
+    "python-slugify>=8.0.4",
 ]
 
 [project.scripts]

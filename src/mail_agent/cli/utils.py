@@ -25,6 +25,15 @@ def handle_exceptions(f: F) -> F:
     """
     @wraps(f)
     def wrapper(*args, **kwargs):
+
+        ctx = click.get_current_context(silent=True)
+        verbose = ctx and ctx.params.get('verbose', False)
+        exceptions = ctx and ctx.params.get('exceptions', False)    
+
+        if exceptions:
+            # If exceptions are enabled, just call the function directly
+            return f(*args, **kwargs)
+
         try:
             return f(*args, **kwargs)
         except click.Abort:
@@ -40,9 +49,7 @@ def handle_exceptions(f: F) -> F:
             click.echo(f"\nError: {str(e)}", err=True)
             
             # Check if verbose flag is set in the context
-            ctx = click.get_current_context(silent=True)
-            verbose = ctx and ctx.params.get('verbose', False)
-            
+
             if verbose:
                 click.echo("\nTraceback:", err=True)
                 traceback.print_exc()

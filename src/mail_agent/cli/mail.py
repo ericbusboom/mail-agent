@@ -131,8 +131,17 @@ def store_emails(user_email, max_results, force_full):
                 # Filter emails that are newer than our latest email
                 new_emails = []
                 for e in emails:
-                    if e.date and e.date > latest_email.send_time:
-                        new_emails.append(e)
+                    # Make sure both dates have timezone information
+                    if e.date and latest_email.send_time:
+                        # Make latest_email.send_time timezone-aware if it's not
+                        from datetime import timezone
+                        latest_time = latest_email.send_time
+                        if latest_time.tzinfo is None:
+                            latest_time = latest_time.replace(tzinfo=timezone.utc)
+                            
+                        # Now we can safely compare
+                        if e.date > latest_time:
+                            new_emails.append(e)
                     elif not e.date:
                         # For emails with no date, we'll include them to be safe
                         click.echo(f"Warning: Email with ID {e.id} has no date, including it anyway")
@@ -253,3 +262,26 @@ def view_emails(user_email, id, list_only, limit):
                 click.echo("-" * 80)
                 
             click.echo(f"\nTo view a specific email, use: mactl mail view --id <email_id>")
+
+
+@mail_cmd.command('delete')
+@handle_exceptions
+def delete():
+    """Delete all emails from the database."""
+    app = init_app()
+    
+    with app.app_context():
+        click.echo("This will delete ALL emails from the database. Are you sure?")
+        if not click.confirm("Do you want to proceed?", default=False):
+            click.echo("Operation cancelled.")
+            return
+        
+        try:
+            # Delete all emails
+            Email.query.delete()
+            db.session.commit()
+            click.echo("All emails deleted successfully.")
+        except Exception as e:
+            click.echo(f"Error deleting emails: {str(e)}", err=True)
+            db.session.rollback()
+            sys.exit(1)

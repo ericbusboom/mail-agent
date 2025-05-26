@@ -164,7 +164,7 @@ class MailAgentApp(Flask):
         self.register_blueprint(main_bp)
             
     def _ensure_db_directory_exists(self):
-        """Ensure the directory for the SQLite database exists"""
+        """Ensure the directory for the SQLite database exists and has correct permissions"""
         db_uri = self.config["SQLALCHEMY_DATABASE_URI"]
         
         # Only needed for SQLite databases
@@ -180,6 +180,14 @@ class MailAgentApp(Flask):
             db_dir = os.path.dirname(db_path)
             if not os.path.exists(db_dir):
                 os.makedirs(db_dir, exist_ok=True)
+                
+            # Set appropriate permissions on the directory
+            import stat
+            os.chmod(db_dir, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)  # 0777 permissions
+            
+            # If the database file exists, ensure it has write permissions
+            if os.path.exists(db_path):
+                os.chmod(db_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH | stat.S_IWOTH)  # 0666 permissions
             
 
 

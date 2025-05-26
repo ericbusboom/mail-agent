@@ -7,7 +7,7 @@ import click
 from mail_agent.cli.utils import handle_exceptions
 from mail_agent.cli.main import cli
 
-# Import all command groups to register them with Click
+# Import command modules to register them with Click
 from mail_agent.cli import db
 from mail_agent.cli import mail
 from mail_agent.cli import config

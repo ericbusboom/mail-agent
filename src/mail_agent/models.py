@@ -65,7 +65,7 @@ class Email(db.Model):
     message_id = db.Column(db.String(255))  # Email Message-ID header
     
     # Email metadata
-    send_time = db.Column(db.DateTime)  # When the email was sent
+    send_time = db.Column(db.DateTime(timezone=True))  # When the email was sent (with timezone)
     from_address = db.Column(db.String(500))  # Sender email address
     to_address = db.Column(db.Text)  # Recipient email addresses
     subject = db.Column(db.Text)  # Email subject
@@ -111,7 +111,15 @@ class Email(db.Model):
         email.id = gmail_message.id
         email.thread_id = gmail_message.thread_id
         email.message_id = gmail_message.message_id
-        email.send_time = gmail_message.date or datetime.now(timezone.utc)  # Use current time if date is missing
+        
+        # Ensure send_time is timezone-aware
+        if gmail_message.date:
+            # If date is already timezone-aware, use it directly
+            email.send_time = gmail_message.date
+        else:
+            # If date is missing, use the current time with UTC timezone
+            email.send_time = datetime.now(timezone.utc)
+            
         email.from_address = gmail_message.sender
         email.to_address = gmail_message.recipient
         email.subject = gmail_message.subject
@@ -146,7 +154,15 @@ class Email(db.Model):
             # Update existing email
             existing_email.thread_id = gmail_message.thread_id
             existing_email.message_id = gmail_message.message_id
-            existing_email.send_time = gmail_message.date or datetime.now(timezone.utc)
+            
+            # Ensure send_time is timezone-aware
+            if gmail_message.date:
+                # If date is already timezone-aware, use it directly
+                existing_email.send_time = gmail_message.date
+            else:
+                # If date is missing, use the current time with UTC timezone
+                existing_email.send_time = datetime.now(timezone.utc)
+                
             existing_email.from_address = gmail_message.sender
             existing_email.to_address = gmail_message.recipient
             existing_email.subject = gmail_message.subject
