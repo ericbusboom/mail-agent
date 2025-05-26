@@ -24,21 +24,33 @@ class MailAgentApp(Flask):
     gmail: Gmail
     llm_manager: LLMManager
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, config_dir: str|Path = None, deployment: str = 'devel', *args, **kwargs):
+        
         super().__init__(*args, **kwargs)
+
         self.secret_key = os.environ.get("SECRET_KEY") or os.urandom(24)
-        self.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///mail_agent.db"
+        
+        # Default database URI, will be overridden by config if available
+       
         self.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
         self.config["WTF_CSRF_ENABLED"] = True
 
-                # Initialize extensions
+        # Load configuration
+        self.app_config = self.get_config(config_dir, deployment)
+        
+        # Update database URI from config if available
+        if self.app_config and 'DATABASE_URI' in self.app_config:
+            self.config["SQLALCHEMY_DATABASE_URI"] = self.app_config.DATABASE_URI
+            # Ensure database directory exists
+            self._ensure_db_directory_exists()
+        else:
+            raise ValueError("DATABASE_URI not found in configuration")
+            
+        # Initialize extensions
         db.init_app(self)
         
         # Register custom template filters
         self.register_template_filters()
-        
-        # Load configuration
-        self.app_config = self.get_config(kwargs.get('config_dir', None))
         
         # Initialize LLM Manager
         self.llm_manager = LLMManager(self)
@@ -151,13 +163,46 @@ class MailAgentApp(Flask):
         self.register_blueprint(instructions_bp)
         self.register_blueprint(main_bp)
             
+    def _ensure_db_directory_exists(self):
+        """Ensure the directory for the SQLite database exists"""
+        db_uri = self.config["SQLALCHEMY_DATABASE_URI"]
+        
+        # Only needed for SQLite databases
+        if db_uri.startswith('sqlite:///'):
+            # Extract the path from the URI
+            db_path = db_uri.replace('sqlite:///', '')
+            
+            # If it's a relative path, make it absolute using the app's root_path
+            if not os.path.isabs(db_path):
+                db_path = os.path.join(self.root_path, db_path)
+                
+            # Create the directory if it doesn't exist
+            db_dir = os.path.dirname(db_path)
+            if not os.path.exists(db_dir):
+                os.makedirs(db_dir, exist_ok=True)
+            
 
 
-def init_app() -> MailAgentApp:
-    """Initialize and configure the Flask application"""
+def init_app(config_dir=None) -> MailAgentApp:
+    """
+    Initialize and configure the Flask application
     
-    # Initialize Flask app
-    return MailAgentApp(__name__)
+    Args:
+        config_dir: Optional path to configuration directory. If not provided,
+                   will look for config in the default location.
+    
+    Returns:
+        Configured MailAgentApp instance
+    """
+    try:
+        # If config_dir is not provided, it will be resolved within the MailAgentApp
+        # The app uses several methods to find the config directory
+        return MailAgentApp(config_dir=config_dir, import_name=__name__)
+    except Exception as e:
+        import sys
+        print(f"Error initializing application: {str(e)}", file=sys.stderr)
+        print("If this is related to database access, try running 'mactl db create' first", file=sys.stderr)
+        raise    
 
 
 

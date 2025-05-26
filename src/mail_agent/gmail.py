@@ -10,6 +10,7 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from datetime import datetime
 import logging
+from mail_agent.html_utils import html_to_text
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +98,10 @@ class GmailMessage:
     def date(self) -> Optional[datetime]:
         """Parse email date string into datetime object."""
 
+        if not self.date_str:
+            logger.warning("Empty date string in email")
+            return None
+
         try:
             # Parse RFC 2822 date format
             parsed_date = email.utils.parsedate_to_datetime(self.date_str)
@@ -109,21 +114,62 @@ class GmailMessage:
     
     @property
     def body_text(self):
-        """Get message body content, extracting it if needed."""
+        """Get message body content, extracting it from plain text or HTML parts."""
         
+        # First try to find a plain text part
         if 'parts' in self._payload:
+            # Try to find text/plain first
             for part in self._payload['parts']:
                 mime_type = part.get('mimeType', '')
                 if mime_type == 'text/plain':
                     data = part.get('body', {}).get('data')
                     if data:
                         return base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
+            
+            # If no text/plain, try text/html
+            for part in self._payload['parts']:
+                mime_type = part.get('mimeType', '')
+                if mime_type == 'text/html':
+                    data = part.get('body', {}).get('data')
+                    if data:
+                        html_content = base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
+                        # Convert HTML to plain text for better readability
+                        return html_to_text(html_content)
+                        
+            # Check for nested parts (multipart/alternative inside multipart/mixed)
+            for part in self._payload['parts']:
+                if 'parts' in part:
+                    # First try text/plain in nested parts
+                    for nested_part in part['parts']:
+                        mime_type = nested_part.get('mimeType', '')
+                        if mime_type == 'text/plain':
+                            data = nested_part.get('body', {}).get('data')
+                            if data:
+                                return base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
+                    
+                    # Then try text/html in nested parts
+                    for nested_part in part['parts']:
+                        mime_type = nested_part.get('mimeType', '')
+                        if mime_type == 'text/html':
+                            data = nested_part.get('body', {}).get('data')
+                            if data:
+                                html_content = base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
+                                return html_to_text(html_content)
         else:
+            # No parts, check the main payload
             mime_type = self._payload.get('mimeType', '')
             if mime_type == 'text/plain':
                 data = self._payload.get('body', {}).get('data')
                 if data:
                     return base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
+            elif mime_type == 'text/html':
+                data = self._payload.get('body', {}).get('data')
+                if data:
+                    html_content = base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
+                    return html_to_text(html_content)
+        
+        # If we get here, we couldn't find a body
+        return ""
     
     
     def has_label(self, label_name: str) -> bool:

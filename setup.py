@@ -6,7 +6,8 @@ from setuptools import setup, find_packages
 setup(
     name="mail-agent",
     version="0.1.0",
-    packages=["mail_agent"],
+    packages=find_packages(where="src"),
+    package_dir={"": "src"},
     include_package_data=True,
     install_requires=[
         "authlib>=1.5.2",
@@ -18,7 +19,7 @@ setup(
         "google-auth-httplib2>=0.2.0",
         "google-auth-oauthlib>=1.2.2",
         "click>=8.1.3",
-    ],
+        ],
     entry_points={
         "console_scripts": [
             "mactl=mail_agent.cli:cli",

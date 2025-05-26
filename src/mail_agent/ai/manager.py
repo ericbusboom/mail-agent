@@ -241,77 +241,7 @@ class LLMManager:
         except Exception as e:
             logger.error(f"Failed to send LLM request: {e}")
             raise
-    
-    def extract_topics_knn(self, messages: List[GmailMessage], n_topics: int = 5) -> List[Dict[str, Any]]:
-        """
-        Extract topics from email messages using KNN clustering.
-        
-        Args:
-            messages: List of GmailMessage objects
-            n_topics: Number of topics to extract
-            
-        Returns:
-            List of topic dictionaries with names, descriptions, and related messages
-        """
-        if len(messages) < n_topics:
-            logger.warning(f"Not enough messages ({len(messages)}) for {n_topics} topics")
-            n_topics = max(1, len(messages))
-        
-        # Extract text content from messages
-        texts = []
-        for msg in messages:
-            # Combine subject and body for better clustering
-            content = f"{msg.subject} {msg.body_text or ''}"
-            texts.append(content)
-        
-        # Vectorize the text using TF-IDF
-        vectorizer = TfidfVectorizer(
-            max_features=1000,
-            stop_words='english',
-            ngram_range=(1, 2)
-        )
-        
-        try:
-            tfidf_matrix = vectorizer.fit_transform(texts)
-        except ValueError as e:
-            logger.error(f"Failed to vectorize texts: {e}")
-            return []
-        
-        # Use KMeans clustering to find topics
-        kmeans = KMeans(n_clusters=n_topics, random_state=42, n_init=10)
-        cluster_labels = kmeans.fit_predict(tfidf_matrix)
-        
-        # Get feature names for interpretation
-        feature_names = vectorizer.get_feature_names_out()
-        
-        # Extract topics from clusters
-        topics = []
-        for cluster_id in range(n_topics):
-            # Get messages in this cluster
-            cluster_messages = [messages[i] for i, label in enumerate(cluster_labels) if label == cluster_id]
-            
-            if not cluster_messages:
-                continue
-            
-            # Get top terms for this cluster
-            cluster_center = kmeans.cluster_centers_[cluster_id]
-            top_indices = cluster_center.argsort()[-10:][::-1]  # Top 10 terms
-            top_terms = [str(feature_names[i]) for i in top_indices]
-            
-            # Create topic name from top terms
-            topic_name = " ".join(top_terms[:3]).title()
-            
-            topics.append({
-                'name': topic_name,
-                'description': f"Topic derived from {len(cluster_messages)} emails with key terms: {', '.join(top_terms[:5])}",
-                'messages': cluster_messages,
-                'message_indices': [i for i, label in enumerate(cluster_labels) if label == cluster_id],
-                'top_terms': top_terms
-            })
-        
-        logger.info(f"Extracted {len(topics)} topics using KNN clustering")
-        return topics
-    
+
     def classify_messages(self, messages: List[GmailMessage], topics_document: str) -> List[Dict[str, Any]]:
         """
         Classify email messages based on provided topic definitions.
